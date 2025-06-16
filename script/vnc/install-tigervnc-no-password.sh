@@ -12,7 +12,12 @@ sudo apt purge -y tightvncserver
 sudo apt update
 sudo apt install -y xfce4 xfce4-goodies tigervnc-standalone-server xterm dbus-x11
 
-# 初始化 vnc 配置目录
+# 清理现有的 VNC 配置
+rm -rf $USER_HOME/.vnc
+sudo -u $REAL_USER mkdir -p $USER_HOME/.vnc
+
+# 初始化 vnc 配置目录（使用无密码模式）
+sudo -u $REAL_USER vncserver -kill :1 > /dev/null 2>&1
 sudo -u $REAL_USER vncserver :1 -SecurityTypes None -localhost no --I-KNOW-THIS-IS-INSECURE
 sudo -u $REAL_USER vncserver -kill :1
 
