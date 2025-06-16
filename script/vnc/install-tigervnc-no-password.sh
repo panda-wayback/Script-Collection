@@ -13,7 +13,7 @@ sudo apt update
 sudo apt install -y xfce4 xfce4-goodies tigervnc-standalone-server xterm dbus-x11
 
 # 初始化 vnc 配置目录
-sudo -u $REAL_USER vncserver :1
+sudo -u $REAL_USER vncserver :1 -SecurityTypes None -localhost no --I-KNOW-THIS-IS-INSECURE
 sudo -u $REAL_USER vncserver -kill :1
 
 # 写入 xstartup 脚本（使用 dbus-launch，避免会话失败）
