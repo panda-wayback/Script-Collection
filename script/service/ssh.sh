@@ -1,9 +1,43 @@
 #!/bin/bash
 
+# 显示帮助信息
+show_help() {
+    echo "SSH 公钥复制工具"
+    echo ""
+    echo "使用方法: $0 [选项] <用户名@主机名>"
+    echo ""
+    echo "选项:"
+    echo "  -h, --help     显示此帮助信息"
+    echo ""
+    echo "参数:"
+    echo "  用户名@主机名   目标主机的用户名和主机名"
+    echo ""
+    echo "示例:"
+    echo "  $0 user@example.com"
+    echo "  $0 admin@192.168.1.100"
+    echo "  $0 -h"
+    echo ""
+    echo "说明:"
+    echo "  此脚本会自动将本地的 SSH 公钥复制到目标主机，"
+    echo "  实现无密码 SSH 登录。"
+    echo ""
+    echo "  如果 SSH 公钥不存在，请先运行:"
+    echo "  ssh-keygen -t rsa"
+    echo ""
+}
+
+# 检查帮助参数
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    show_help
+    exit 0
+fi
+
 # 检查是否提供了目标主机参数
 if [ $# -eq 0 ]; then
+    echo "错误: 缺少目标主机参数"
+    echo ""
     echo "使用方法: $0 <用户名@主机名>"
-    echo "示例: $0 user@example.com"
+    echo "使用 '$0 -h' 查看详细帮助信息"
     exit 1
 fi
 
