@@ -147,29 +147,31 @@ echo "⏳ 正在创建虚拟机，请稍候..."
 
 # 根据模式生成不同的cloud-init配置
 if [ "$ROOT_MODE" = true ]; then
-  # Root用户模式配置
+  # 生成加密密码
+  ENCRYPTED_PASS=$(openssl passwd -6 "$PASSWORD")
   multipass launch --name "$VM_NAME" \
     --cpus "$CPU" --memory "$RAM" --disk "$DISK" \
     --cloud-init - <<EOF
 #cloud-config
 ssh_pwauth: true
 disable_root: false
-ssh_authorized_keys: []
 
 users:
   - name: root
-    lock_passwd: false
-    sudo: ALL=(ALL) NOPASSWD:ALL
+    gecos: Root
+    primary_group: root
+    groups: [root, adm, dialout, cdrom, floppy, sudo, audio, dip, video, plugdev, netdev]
     shell: /bin/bash
+    lock_passwd: false
+    passwd: $ENCRYPTED_PASS
+    sudo: ALL=(ALL) NOPASSWD:ALL
     ssh_pwauth: true
+    plain_text_passwd: true
 
 chpasswd:
   list: |
-    root:${PASSWORD}
+    root:$PASSWORD
   expire: false
-
-ssh_pwauth: true
-disable_root: false
 
 write_files:
   - path: /etc/ssh/sshd_config.d/allow_root.conf
@@ -177,6 +179,13 @@ write_files:
     content: |
       PermitRootLogin yes
       PasswordAuthentication yes
+  - path: /etc/pam.d/sshd
+    permissions: '0644'
+    content: |
+      @include common-auth
+      @include common-account
+      @include common-session
+      @include common-password
   - path: /etc/resolv.conf
     permissions: '0644'
     content: |
@@ -185,6 +194,8 @@ write_files:
       options edns0
 
 runcmd:
+  - sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+  - sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
   - systemctl restart ssh
 EOF
 else
