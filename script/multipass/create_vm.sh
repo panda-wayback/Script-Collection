@@ -20,6 +20,7 @@ show_help() {
   echo ""
   echo "选项:"
   echo "  -r, --root    创建默认用户为root的虚拟机"
+  echo "  -i, --image   指定Ubuntu镜像版本。如果省略，将提示进行选择 (默认: 22.04)"
   echo "  -h, --help    显示此帮助信息"
   echo ""
   echo "参数说明:"
@@ -35,6 +36,7 @@ show_help() {
   echo "  $0 my-vm mypass                      # 指定名称和密码"
   echo "  $0 my-vm mypass 4 8G 50G            # 指定所有参数"
   echo "  $0 --root my-vm mypass 2 4G 30G     # 创建root用户虚拟机"
+  echo "  $0 --image 22.04 my-vm              # 指定镜像版本创建虚拟机"
   echo "  $0 -r my-vm mypass 2 4G 30G         # 创建root用户虚拟机（短选项）"
   echo "  $0 my-vm --root mypass 2 4G 30G     # 创建root用户虚拟机（位置灵活）"
   echo ""
@@ -43,19 +45,32 @@ show_help() {
 # ========== 参数处理 ==========
 ROOT_MODE=false
 HELP_MODE=false
+IMAGE=""
 
 # 处理所有参数，过滤掉选项
 PARAMS=()
-for arg in "$@"; do
-  case $arg in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     -h|--help)
       HELP_MODE=true
+      shift
       ;;
     -r|--root)
       ROOT_MODE=true
+      shift
+      ;;
+    -i|--image)
+      if [[ -n "$2" && ! "$2" =~ ^- ]]; then
+        IMAGE="$2"
+        shift 2
+      else
+        echo "❌ 错误: --image 选项需要一个版本号参数" >&2
+        exit 1
+      fi
       ;;
     *)
-      PARAMS+=("$arg")
+      PARAMS+=("$1")
+      shift
       ;;
   esac
 done
@@ -64,6 +79,14 @@ done
 if [ "$HELP_MODE" = true ]; then
   show_help
   exit 0
+fi
+
+# ========== 镜像选择 (如果未通过命令行指定) ==========
+if [ -z "$IMAGE" ]; then
+  echo "支持的镜像版本: 22.04, 24.04, 20.04, lts"
+  read -p "请选择一个镜像版本, 或按Enter使用默认值 (22.04): " SELECTED_IMAGE
+  IMAGE=${SELECTED_IMAGE:-22.04}
+  echo # 换行保持输出整洁
 fi
 
 # ========== 默认配置 ==========
@@ -85,6 +108,13 @@ RAM=${PARAMS[3]:-$DEFAULT_RAM}
 DISK=${PARAMS[4]:-$DEFAULT_DISK}
 
 # ========== 参数验证 ==========
+
+# 镜像版本验证
+if [ -n "$IMAGE" ] && ! [[ "$IMAGE" =~ ^(20.04|22.04|24.04|lts)$ ]]; then
+  echo "❌ 无效的镜像版本：$IMAGE"
+  echo "   支持的版本为: 20.04, 22.04, 24.04, lts"
+  exit 1
+fi
 
 # 名称合法性检查
 if [[ ! "$VM_NAME" =~ ^[a-zA-Z][a-zA-Z0-9-]*$ ]]; then
@@ -131,6 +161,7 @@ fi
 echo "🚀 开始创建虚拟机..."
 echo "📋 配置信息:"
 echo "   名称: $VM_NAME"
+echo "   镜像: $IMAGE"
 echo "   CPU: $CPU 核心"
 echo "   内存: $RAM"
 echo "   硬盘: $DISK"
@@ -149,7 +180,7 @@ echo "⏳ 正在创建虚拟机，请稍候..."
 if [ "$ROOT_MODE" = true ]; then
   # 生成加密密码
   ENCRYPTED_PASS=$(openssl passwd -6 "$PASSWORD")
-  multipass launch --name "$VM_NAME" \
+  multipass launch ${IMAGE:+"$IMAGE"} --name "$VM_NAME" \
     --cpus "$CPU" --memory "$RAM" --disk "$DISK" \
     --cloud-init - <<EOF
 #cloud-config
@@ -200,7 +231,7 @@ runcmd:
 EOF
 else
   # 默认ubuntu用户模式配置
-  multipass launch --name "$VM_NAME" \
+  multipass launch ${IMAGE:+"$IMAGE"} --name "$VM_NAME" \
     --cpus "$CPU" --memory "$RAM" --disk "$DISK" \
     --cloud-init - <<EOF
 #cloud-config
