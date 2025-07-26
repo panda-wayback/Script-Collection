@@ -55,11 +55,35 @@ EOF
 sudo chmod +x $USER_HOME/.vnc/xstartup
 sudo chown $REAL_USER:$REAL_USER $USER_HOME/.vnc/xstartup
 
-# 写入 VNC 启动脚本（无密码 + 监听外部）
+# 写入 VNC 启动脚本（无密码 + 监听外部 + 分辨率选择）
 cat <<EOF | sudo tee $USER_HOME/start-vnc.sh > /dev/null
 #!/bin/bash
+# 如果提供了参数，直接使用它作为分辨率
+if [ -n "$1" ]; then
+    GEOMETRY="$1"
+else
+    # 否则，显示一个菜单让用户选择
+    echo "请选择一个分辨率:"
+    options=("1280x800" "1440x900" "1600x900" "1920x1080" "退出")
+    select opt in "${options[@]}"
+    do
+        case $opt in
+            "1280x800"|"1440x900"|"1600x900"|"1920x1080")
+                GEOMETRY="$opt"
+                break
+                ;;
+            "退出")
+                echo "👋 已取消启动"
+                exit 0
+                ;;
+            *) echo "❌ 无效选项 $REPLY";;
+        esac
+    done
+fi
+
 vncserver -kill :1 > /dev/null 2>&1
-vncserver :1 -SecurityTypes None -localhost no --I-KNOW-THIS-IS-INSECURE
+echo "🚀 正在以分辨率 $GEOMETRY 启动 VNC 服务..."
+vncserver :1 -SecurityTypes None -localhost no -geometry $GEOMETRY --I-KNOW-THIS-IS-INSECURE
 EOF
 
 sudo chmod +x $USER_HOME/start-vnc.sh
@@ -69,7 +93,7 @@ sudo chown $REAL_USER:$REAL_USER $USER_HOME/start-vnc.sh
 if [ "$USER" != "root" ]; then
   # 普通用户：使用crontab
   crontab -l 2>/dev/null | grep -v start-vnc.sh > /tmp/crontab.vnc.tmp
-  echo "@reboot $HOME/start-vnc.sh" >> /tmp/crontab.vnc.tmp
+  echo "@reboot $HOME/start-vnc.sh 1920x1080" >> /tmp/crontab.vnc.tmp
   crontab /tmp/crontab.vnc.tmp
   rm /tmp/crontab.vnc.tmp
   echo "🔁 已添加开机自动启动到当前用户 crontab"
@@ -84,7 +108,7 @@ After=network.target
 Type=forking
 User=$REAL_USER
 WorkingDirectory=$USER_HOME
-ExecStart=$USER_HOME/start-vnc.sh
+ExecStart=$USER_HOME/start-vnc.sh 1920x1080
 Restart=always
 
 [Install]
@@ -96,6 +120,7 @@ EOF
   echo "🔁 已添加开机自动启动到systemd服务"
 fi
 
-echo "✅ 设置完成，重启系统后将自动启动 VNC 服务，允许无密码访问"
-echo "👉 建议你使用 VNC Viewer 连接 <设备IP>:5901，无需密码"
+echo "✅ 设置完成，重启系统后将以默认分辨率 1920x1080 自动启动 VNC 服务"
+echo "👉 手动运行时，请运行 ~/start-vnc.sh，然后根据提示选择分辨率"
+echo "👉 您也可以直接指定任意分辨率启动: ~/start-vnc.sh <宽x高> (例如: ~/start-vnc.sh 1366x768)"
 echo "📌 注意：请确保防火墙允许 5901 端口访问"
